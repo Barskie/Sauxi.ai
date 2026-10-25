@@ -1,0 +1,11 @@
+{
+  "name": "sauxi-ai",
+  "private": true,
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test tests/image-import.test.mjs tests/server.test.mjs tests/ui.test.mjs tests/video.test.mjs"
+  },
+  "dependencies": {
+    "siray": "^1.3.0"
+  }
+}

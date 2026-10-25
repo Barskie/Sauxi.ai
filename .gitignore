@@ -1,0 +1,8 @@
+node_modules/
+tools/
+saved-results*/
+*.log
+*.env
+.env.*
+*.local
+Sauxi.ai preview.png
