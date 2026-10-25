@@ -163,16 +163,19 @@ test('Kling is absent from video choices and cannot be submitted',async()=>{
 test('public post import feeds a local MP4 without treating the post as a direct file URL',async()=>{
  assert.throws(()=>validateVideoLink('http://127.0.0.1/private'));
  assert.throws(()=>validateVideoLink('https://localhost/private'));
- const importer=async(url,options)=>importSocialVideo(url,{extractor:async(command,args)=>{
+ const runtimeDir=await mkdtemp(path.join(tmpdir(),'sauxi-import-test-'));
+ const importer=async(url,options)=>importSocialVideo(url,{runtimeDir,extractor:async(command,args)=>{
   assert.match(command,/yt-dlp(?:\.exe)?$/);assert.equal(args.at(-1),'https://www.pinterest.com/pin/12345/');assert.match(args[args.indexOf('-f')+1],/bv\*\[ext=mp4\]/);
-  await writeFile(args[args.indexOf('-o')+1].replace('%(ext)s','mp4'),mp4);
+  assert.equal(args[args.indexOf('--concurrent-fragments')+1],'1');assert.equal(args[args.indexOf('--fragment-retries')+1],'2');assert.ok(args.includes('--no-part'));
+  const output=args[args.indexOf('-o')+1];assert.equal(path.dirname(path.dirname(output)),runtimeDir);
+  await writeFile(output.replace('%(ext)s','mp4'),mp4);
  }});
  const server=createStudio({videoImporter:importer});
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const base='http://127.0.0.1:'+server.address().port;
  try{const html=await(await fetch(base+'/video')).text();const token=html.match(/const studioToken='([^']+)'/)[1];
   const response=await fetch(base+'/api/import-video',{method:'POST',headers:{'X-Studio-Token':token,'Content-Type':'application/json'},body:JSON.stringify({url:'https://www.pinterest.com/pin/12345/'})});
   assert.equal(response.status,200);const data=await response.json();assert.equal(data.data,videoData);assert.equal(data.name,'Imported video.mp4');
- }finally{await new Promise(resolve=>server.close(resolve))}
+ }finally{await new Promise(resolve=>server.close(resolve));await rm(runtimeDir,{recursive:true,force:true})}
 });
 
 test('selected still frame produces a separate identity-to-frame image prompt',async()=>{

@@ -1,12 +1,13 @@
 import {execFile} from 'node:child_process';
-import {mkdtemp,readFile,readdir,rm} from 'node:fs/promises';
-import {tmpdir} from 'node:os';
+import {mkdir,mkdtemp,readFile,readdir,rm} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {existsSync} from 'node:fs';
 
 const MAX_BYTES=36*1024*1024;
-const bundledYtDlp=path.join(path.dirname(fileURLToPath(import.meta.url)),'tools','yt-dlp.exe');
+const APP_DIR=path.dirname(fileURLToPath(import.meta.url));
+const RUNTIME_DIR=path.join(APP_DIR,'.runtime');
+const bundledYtDlp=path.join(APP_DIR,'tools','yt-dlp.exe');
 const DEFAULT_COMMAND=process.platform==='win32'&&existsSync(bundledYtDlp)?bundledYtDlp:'yt-dlp';
 const fail=(message,code=400)=>Object.assign(new Error(message),{code});
 export function validateVideoLink(value){
@@ -21,21 +22,25 @@ function runExtractor(command,args){
     if(error){
       if(error.code==='ENOENT')return reject(fail('The link importer needs yt-dlp. Install it from the official yt-dlp project, then restart Sauxi.ai.',503));
       const detail=String(stderr||error.message).split('\n').filter(Boolean).slice(-2).join(' ').slice(0,300);
+      if(/Unable to rename file|WinError 5|Access is denied/i.test(detail))return reject(fail('Windows blocked the temporary video download. Restart Sauxi.ai and retry the link.',502));
       return reject(fail('Could not import this public post. It may require a login, be unavailable, or be too long. '+detail,502));
     }
     resolve(stdout);
   }));
 }
 function ffmpegAvailable(){return new Promise(resolve=>{try{execFile('ffmpeg',['-version'],{timeout:5000,windowsHide:true},error=>resolve(!error));}catch{resolve(false)}});}
-export async function importSocialVideo(value,{extractor=runExtractor,command=DEFAULT_COMMAND}={}){
+export async function importSocialVideo(value,{extractor=runExtractor,command=DEFAULT_COMMAND,runtimeDir=RUNTIME_DIR}={}){
   const url=validateVideoLink(value);
-  const dir=await mkdtemp(path.join(tmpdir(),'avatar-studio-video-'));
+  // Windows can lock HLS fragments in the packaged-app Temp folder before
+  // yt-dlp renames them. Keep imports in an app-owned runtime directory.
+  await mkdir(runtimeDir,{recursive:true});
+  const dir=await mkdtemp(path.join(runtimeDir,'video-import-'));
   try{
     // Pinterest often publishes video and audio as separate HLS streams.
     // Merge both when FFmpeg is present; retain a playable video-only path otherwise.
     const mergeAudio=await ffmpegAvailable();
     const formats=mergeAudio?'b[ext=mp4]/bv*[ext=mp4]+ba/bv*[ext=mp4]/b':'b[ext=mp4]/b/bv*[ext=mp4]/bv*';
-    await extractor(command,['--no-playlist','--no-progress','--no-warnings','--max-filesize','36M','-f',formats,'--merge-output-format','mp4','--remux-video','mp4','-o',path.join(dir,'reference.%(ext)s'),url]);
+    await extractor(command,['--no-playlist','--no-progress','--no-warnings','--no-part','--concurrent-fragments','1','--retries','2','--fragment-retries','2','--max-filesize','36M','-f',formats,'--merge-output-format','mp4','--remux-video','mp4','-o',path.join(dir,'reference.%(ext)s'),url]);
     const files=await readdir(dir);const name=files.find(file=>file==='reference.mp4')||files.find(file=>file.toLowerCase().endsWith('.mp4'));
     if(!name)throw fail('This link did not provide a playable MP4. Try another public post or drop an MP4 file.',502);
     const bytes=await readFile(path.join(dir,name));
