@@ -1,5 +1,9 @@
 # Sauxi.ai
 
+## Download
+
+GitHub Releases provide the versioned `Sauxi.ai-vX.Y.Z.zip` package. The archive contains committed source only and excludes API keys, dependencies, runtime files, saved results, logs, and downloaded tools. See [GROK.md](GROK.md) for a concise machine-readable integration guide.
+
 ## Start
 
 Install Node.js 22 or newer, run `npm install` in this folder, then double-click **Start Sauxi.ai.cmd** (or run `npm start`). Leave its server window open and visit **http://127.0.0.1:4318**. Run `npm test` to check the local app.
@@ -48,3 +52,4 @@ Video API references: [Siray Wan 3.0](https://blog.siray.ai/wan-3-0-uncensored-v
 - https://developers.openai.com/api/reference/resources/images/methods/edit
 - https://blog.siray.ai/seedream-4-5-spicy-vs-5-0-pro-spicy/
 - https://docs.siray.ai/api-reference/task-status-image
+

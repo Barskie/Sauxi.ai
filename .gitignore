@@ -1,9 +1,11 @@
 node_modules/
 tools/
 .runtime/
+dist/
 saved-results*/
 *.log
 *.env
 .env.*
 *.local
 Sauxi.ai preview.png
+
